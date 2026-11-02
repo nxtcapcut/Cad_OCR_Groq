@@ -47,15 +47,15 @@
           <h1 class="font-bold text-base tracking-wide">CAD Batch OCR & PDF Overlay</h1>
           <span class="px-2 py-0.5 rounded bg-orange-500 text-slate-950 font-mono font-bold text-[10px]">GROQ VISION</span>
         </div>
-        <p class="text-xs text-slate-400">Tốc độ cao qua Llama-3.2-11b-Vision • Xuất PDF Vector lớp chữ tím bôi đen copy</p>
+        <p class="text-xs text-slate-400">Tốc độ cao qua Llama-3.2-90b-Vision • Xuất PDF Vector lớp chữ tím bôi đen copy</p>
       </div>
     </div>
 
-    <!-- Cài đặt API Key & Model -->
+    <!-- API Key & Model -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs">
         <span class="text-slate-400">Model:</span>
-        <span class="text-orange-400 font-mono font-semibold">llama-3.2-11b-vision-preview</span>
+        <span class="text-orange-400 font-mono font-semibold">llama-3.2-90b-vision-preview</span>
       </div>
 
       <div class="relative flex items-center">
@@ -68,7 +68,7 @@
     </div>
   </header>
 
-  <!-- Thân giao diện -->
+  <!-- Main Body -->
   <main class="flex-1 p-6 grid grid-cols-12 gap-6 overflow-hidden">
     <!-- Cột trái: Kéo thả file & Danh sách -->
     <section class="col-span-3 flex flex-col gap-4">
@@ -96,12 +96,12 @@
           <button id="btnClearAll" class="text-[11px] text-rose-400 hover:underline">Xoá toàn bộ</button>
         </div>
         <div id="fileList" class="flex-1 overflow-y-auto p-2 space-y-2">
-          <!-- Item file sẽ chèn tại đây -->
+          <!-- Item file -->
         </div>
       </div>
     </section>
 
-    <!-- Cột giữa: Khung xem trước bản vẽ & Lớp phủ Vector -->
+    <!-- Cột giữa: Xem trước bản vẽ & Lớp phủ Vector -->
     <section class="col-span-6 border border-slate-800 rounded-xl bg-slate-900/20 flex flex-col overflow-hidden">
       <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs">
         <div class="flex items-center gap-4">
@@ -124,7 +124,7 @@
       </div>
     </section>
 
-    <!-- Cột phải: Khung hiển thị nội dung Text trích xuất -->
+    <!-- Cột phải: Text trích xuất -->
     <section class="col-span-3 border border-slate-800 rounded-xl bg-slate-900/20 flex flex-col overflow-hidden">
       <div class="p-2 border-b border-slate-800 flex text-xs">
         <button id="tabAllText" class="flex-1 py-1 text-center border-b-2 border-orange-500 font-semibold text-orange-400">Text 1 cột (Toàn bộ)</button>
@@ -155,7 +155,6 @@
     const emptyNotice = document.getElementById('emptyPreviewNotice');
     const textContent = document.getElementById('textContent');
 
-    // Khởi tạo Key từ localStorage
     apiKeyInput.value = localStorage.getItem('groq_cad_key') || '';
     apiKeyInput.addEventListener('change', () => {
       localStorage.setItem('groq_cad_key', apiKeyInput.value.trim());
@@ -267,7 +266,7 @@
       textContent.textContent = current.textItems.map(i => i.text).join('\n');
     }
 
-    // GỌI GROQ VISION API
+    // GỌI GROQ VISION API VỚI MODEL 90B
     async function callGroqVision(base64Data, apiKey) {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -276,14 +275,14 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.2-11b-vision-preview',
+          model: 'llama-3.2-90b-vision-preview',
           messages: [
             {
               role: 'user',
               content: [
                 {
                   type: 'text',
-                  text: 'Trích xuất toàn bộ văn bản kỹ thuật và tọa độ chuẩn hóa [ymin, xmin, ymax, xmax] (từ 0 đến 1000). Trả về JSON duy nhất theo định dạng: {"textItems": [{"text": "...", "box_2d": [ymin, xmin, ymax, xmax]}]}'
+                  text: 'Trích xuất toàn bộ chữ/ký hiệu kỹ thuật trong bản vẽ CAD kèm tọa độ box_2d [ymin, xmin, ymax, xmax] chuẩn hóa từ 0 đến 1000. Trả về đúng 1 khối JSON duy nhất: {"textItems": [{"text": "...", "box_2d": [ymin, xmin, ymax, xmax]}]}'
                 },
                 {
                   type: 'image_url',
@@ -307,7 +306,7 @@
       return JSON.parse(content);
     }
 
-    // XỬ LÝ HÀNG LOẠT (BATCH OCR)
+    // CHẠY OCR HÀNG LOẠT
     document.getElementById('btnStartOcr').addEventListener('click', async () => {
       const key = apiKeyInput.value.trim();
       if (!key) return alert('Vui lòng nhập Groq API Key!');
@@ -336,8 +335,7 @@
           renderTextTab();
         }
 
-        // Tạm dừng 1 giây giữa các bản vẽ để ổn định kết nối
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1200));
       }
     });
 
@@ -345,6 +343,44 @@
     document.getElementById('btnCopyText').addEventListener('click', () => {
       navigator.clipboard.writeText(textContent.textContent);
       alert('Đã sao chép nội dung văn bản!');
+    });
+
+    // XUẤT TXT
+    document.getElementById('btnExportTxt').addEventListener('click', () => {
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || current.textItems.length === 0) return alert('Chưa có text để tải!');
+      const blob = new Blob([current.textItems.map(i => i.text).join('\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${current.name.replace(/\.[^/.]+$/, '')}.txt`;
+      a.click();
+    });
+
+    // XUẤT PDF OVERLAY
+    document.getElementById('btnExportPdf').addEventListener('click', async () => {
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || current.textItems.length === 0) return alert('Chưa có dữ liệu để xuất PDF!');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: mainImg.naturalWidth > mainImg.naturalHeight ? 'l' : 'p',
+        unit: 'px',
+        format: [mainImg.naturalWidth, mainImg.naturalHeight]
+      });
+
+      pdf.addImage(current.dataUrl, 'PNG', 0, 0, mainImg.naturalWidth, mainImg.naturalHeight);
+      pdf.setTextColor(147, 51, 234);
+
+      current.textItems.forEach(item => {
+        if (!item.box_2d) return;
+        const [ymin, xmin, ymax, xmax] = item.box_2d;
+        const x = (xmin / 1000) * mainImg.naturalWidth;
+        const y = (ymax / 1000) * mainImg.naturalHeight;
+        const h = ((ymax - ymin) / 1000) * mainImg.naturalHeight;
+        pdf.setFontSize(Math.max(h * 0.8, 8));
+        pdf.text(item.text, x, y);
+      });
+
+      pdf.save(`${current.name.replace(/\.[^/.]+$/, '')}_overlay.pdf`);
     });
 
     // XOÁ TẤT CẢ
