@@ -40,6 +40,447 @@
       </div>
     </div>
 
+    <!-- API Key & Dropdown Model -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs">
+        <span class="text-slate-400">Model:</span>
+        <select id="modelSelect" class="bg-transparent text-orange-400 font-mono font-semibold focus:outline-none cursor-pointer">
+          <option value="" class="bg-slate-900 text-slate-300">Đang nạp model từ Groq...</option>
+        </select>
+        <button id="btnRefreshModels" title="Tải lại danh sách Model" class="text-slate-400 hover:text-white ml-1 text-xs">↻</button>
+      </div>
+
+      <div class="relative flex items-center">
+        <input type="password" id="groqApiKey" placeholder="Dán Groq API Key (gsk_...)" 
+               class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs w-64 focus:outline-none focus:border-orange-500 font-mono pr-8">
+        <button id="toggleKey" class="absolute right-2 text-slate-500 hover:text-slate-300">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Giao diện chính -->
+  <main class="flex-1 p-6 grid grid-cols-12 gap-6 overflow-hidden">
+    <!-- Cột trái: Kéo thả file & Danh sách -->
+    <section class="col-span-3 flex flex-col gap-4">
+      <div id="dropZone" class="border-2 border-dashed border-slate-800 hover:border-orange-500/50 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition bg-slate-900/20">
+        <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <p class="text-xs text-center font-medium">Kéo thả bản vẽ kỹ thuật vào đây<br><span class="text-[11px] text-slate-500">hoặc bấm để chọn từ máy</span></p>
+        <input type="file" id="fileInput" multiple accept="image/*" class="hidden">
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnStartOcr" class="col-span-2 bg-orange-600 hover:bg-orange-500 text-white font-medium py-2 rounded-lg text-xs transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Bắt đầu OCR (Groq)
+        </button>
+        <button id="btnDownloadAllZip" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 py-1.5 rounded-lg text-xs transition">Tất cả (.ZIP)</button>
+        <button id="btnDownloadPdfZip" class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 py-1.5 rounded-lg text-xs transition">PDF .ZIP</button>
+      </div>
+
+      <div class="flex-1 border border-slate-800 rounded-xl bg-slate-900/20 flex flex-col overflow-hidden">
+        <div class="p-3 border-b border-slate-800 text-xs font-semibold text-slate-400 flex justify-between items-center">
+          <span>Danh sách bản vẽ (<span id="fileCount">0</span>)</span>
+          <button id="btnClearAll" class="text-[11px] text-rose-400 hover:underline">Xoá toàn bộ</button>
+        </div>
+        <div id="fileList" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- Cột giữa: Xem trước bản vẽ & Lớp phủ Vector -->
+    <section class="col-span-6 border border-slate-800 rounded-xl bg-slate-900/20 flex flex-col overflow-hidden">
+      <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="chkOverlay" checked class="rounded border-slate-800 text-purple-600 focus:ring-0">
+          <span>Hiển thị Lớp Chữ Đè (Overlay)</span>
+        </label>
+        <div class="flex gap-2">
+          <button id="btnExportTxt" class="bg-slate-900 border border-slate-800 px-2 py-1 rounded text-[11px] hover:bg-slate-800">Tải .TXT</button>
+          <button id="btnExportPdf" class="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded text-[11px]">Tải PDF Overlay</button>
+        </div>
+      </div>
+      <div id="previewContainer" class="flex-1 overflow-auto p-4 flex items-center justify-center relative bg-slate-950/50">
+        <div id="canvasWrapper" class="relative inline-block border border-slate-800">
+          <img id="mainPreviewImg" class="max-w-none block" style="display:none;" />
+          <div id="overlayLayer" class="absolute inset-0 pointer-events-auto"></div>
+        </div>
+        <div id="emptyPreviewNotice" class="text-slate-600 text-xs">Chưa có bản vẽ nào được chọn</div>
+      </div>
+    </section>
+
+    <!-- Cột phải: Text trích xuất -->
+    <section class="col-span-3 border border-slate-800 rounded-xl bg-slate-900/20 flex flex-col overflow-hidden">
+      <div class="p-2 border-b border-slate-800 flex text-xs">
+        <button id="tabAllText" class="flex-1 py-1 text-center border-b-2 border-orange-500 font-semibold text-orange-400">Text 1 cột (Toàn bộ)</button>
+      </div>
+      <div class="p-2 flex justify-end border-b border-slate-800/50">
+        <button id="btnCopyText" class="text-[11px] text-slate-400 hover:text-white">Sao chép</button>
+      </div>
+      <div class="flex-1 p-3 overflow-y-auto">
+        <pre id="textContent" class="text-xs text-slate-300 font-mono whitespace-pre-wrap">[Chưa có dữ liệu văn bản]</pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STATE = {
+      files: [],
+      currentIndex: -1
+    };
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileListEl = document.getElementById('fileList');
+    const fileCountEl = document.getElementById('fileCount');
+    const apiKeyInput = document.getElementById('groqApiKey');
+    const modelSelect = document.getElementById('modelSelect');
+    const btnRefreshModels = document.getElementById('btnRefreshModels');
+    const mainImg = document.getElementById('mainPreviewImg');
+    const overlayLayer = document.getElementById('overlayLayer');
+    const emptyNotice = document.getElementById('emptyPreviewNotice');
+    const textContent = document.getElementById('textContent');
+
+    apiKeyInput.value = localStorage.getItem('groq_cad_key') || '';
+
+    // Tự động tải danh sách Model còn sống từ máy chủ Groq
+    async function fetchGroqModels() {
+      const key = apiKeyInput.value.trim();
+      if (!key) {
+        modelSelect.innerHTML = '<option value="">Dán Key để nạp Model</option>';
+        return;
+      }
+
+      modelSelect.innerHTML = '<option value="">Đang nạp Model từ Groq...</option>';
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/models', {
+          headers: { 'Authorization': `Bearer ${key}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        const models = data.data || [];
+        // Lọc các model đang active, ưu tiên model có khả năng xử lý thị giác
+        const visionCandidates = models.filter(m => m.active !== false && (
+          m.id.includes('vision') || 
+          m.id.includes('scenic') || 
+          m.id.includes('llama-4') || 
+          m.id.includes('llama-3.2')
+        ));
+        const finalCandidates = visionCandidates.length > 0 ? visionCandidates : models.filter(m => m.active !== false);
+
+        modelSelect.innerHTML = '';
+        finalCandidates.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.id;
+          opt.className = 'bg-slate-900 text-slate-200';
+          modelSelect.appendChild(opt);
+        });
+
+        const savedModel = localStorage.getItem('groq_cad_model');
+        if (savedModel && Array.from(modelSelect.options).some(o => o.value === savedModel)) {
+          modelSelect.value = savedModel;
+        }
+      } catch (err) {
+        console.error(err);
+        modelSelect.innerHTML = '<option value="">Lỗi tải Model (Kiểm tra lại Key)</option>';
+      }
+    }
+
+    apiKeyInput.addEventListener('change', () => {
+      localStorage.setItem('groq_cad_key', apiKeyInput.value.trim());
+      fetchGroqModels();
+    });
+
+    modelSelect.addEventListener('change', () => {
+      localStorage.setItem('groq_cad_model', modelSelect.value);
+    });
+
+    btnRefreshModels.addEventListener('click', fetchGroqModels);
+
+    if (apiKeyInput.value.trim()) {
+      fetchGroqModels();
+    }
+
+    document.getElementById('toggleKey').addEventListener('click', () => {
+      apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-orange-500'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-orange-500'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-orange-500');
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    function handleFiles(selectedFiles) {
+      for (const file of selectedFiles) {
+        if (!file.type.startsWith('image/')) continue;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          STATE.files.push({
+            name: file.name,
+            dataUrl: e.target.result,
+            status: 'Chờ',
+            textItems: []
+          });
+          renderFileList();
+          if (STATE.currentIndex === -1) selectFile(0);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function renderFileList() {
+      fileCountEl.textContent = STATE.files.length;
+      fileListEl.innerHTML = '';
+      STATE.files.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = `p-2 rounded-lg border text-xs cursor-pointer flex items-center justify-between ${
+          index === STATE.currentIndex ? 'bg-orange-500/10 border-orange-500/50' : 'bg-slate-900 border-slate-800'
+        }`;
+        
+        let statusBadge = `<span class="text-[10px] text-slate-500">Chờ</span>`;
+        if (item.status === 'Đang xử lý') statusBadge = `<span class="text-[10px] text-orange-400 animate-pulse">Đang quét...</span>`;
+        if (item.status === 'Hoàn tất') statusBadge = `<span class="text-[10px] text-emerald-400">Hoàn tất</span>`;
+        if (item.status === 'Lỗi') statusBadge = `<span class="text-[10px] text-rose-400">Lỗi</span>`;
+
+        div.innerHTML = `
+          <div class="truncate max-w-[150px]"><span class="font-medium">${index + 1}. ${item.name}</span></div>
+          <div>${statusBadge}</div>
+        `;
+        div.onclick = () => selectFile(index);
+        fileListEl.appendChild(div);
+      });
+    }
+
+    function selectFile(index) {
+      if (index < 0 || index >= STATE.files.length) return;
+      STATE.currentIndex = index;
+      renderFileList();
+      const current = STATE.files[index];
+
+      emptyNotice.style.display = 'none';
+      mainImg.style.display = 'block';
+      mainImg.src = current.dataUrl;
+
+      mainImg.onload = () => {
+        renderOverlay();
+        renderTextTab();
+      };
+    }
+
+    function renderOverlay() {
+      overlayLayer.innerHTML = '';
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || !document.getElementById('chkOverlay').checked) return;
+
+      const w = mainImg.clientWidth;
+      const h = mainImg.clientHeight;
+
+      current.textItems.forEach(item => {
+        if (!item.box_2d) return;
+        const [ymin, xmin, ymax, xmax] = item.box_2d;
+        const box = document.createElement('div');
+        box.className = 'overlay-box';
+        box.style.top = `${(ymin / 1000) * h}px`;
+        box.style.left = `${(xmin / 1000) * w}px`;
+        box.style.width = `${((xmax - xmin) / 1000) * w}px`;
+        box.style.height = `${((ymax - ymin) / 1000) * h}px`;
+        box.title = item.text;
+        box.textContent = item.text;
+        overlayLayer.appendChild(box);
+      });
+    }
+
+    document.getElementById('chkOverlay').addEventListener('change', renderOverlay);
+
+    function renderTextTab() {
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || current.textItems.length === 0) {
+        textContent.textContent = current && current.errorMsg ? `Lỗi: ${current.errorMsg}` : '[Chưa có dữ liệu]';
+        return;
+      }
+      textContent.textContent = current.textItems.map(i => i.text).join('\n');
+    }
+
+    // Gọi API Groq với Model được chọn
+    async function callGroqVision(base64Data, apiKey, selectedModel) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Trích xuất toàn bộ chữ/ký hiệu kỹ thuật CAD kèm tọa độ box_2d [ymin, xmin, ymax, xmax] chuẩn hóa 0-1000. Trả về đúng 1 khối JSON duy nhất: {"textItems": [{"text": "...", "box_2d": [ymin, xmin, ymax, xmax]}]}'
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: base64Data }
+                }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      const content = json.choices[0].message.content;
+      return JSON.parse(content);
+    }
+
+    // Chạy hàng loạt OCR
+    document.getElementById('btnStartOcr').addEventListener('click', async () => {
+      const key = apiKeyInput.value.trim();
+      const model = modelSelect.value;
+      if (!key) return alert('Vui lòng nhập Groq API Key!');
+      if (!model) return alert('Chưa chọn model hợp lệ!');
+      if (STATE.files.length === 0) return alert('Chưa có bản vẽ nào!');
+
+      for (let i = 0; i < STATE.files.length; i++) {
+        const item = STATE.files[i];
+        if (item.status === 'Hoàn tất') continue;
+
+        item.status = 'Đang xử lý';
+        renderFileList();
+
+        try {
+          const result = await callGroqVision(item.dataUrl, key, model);
+          item.textItems = result.textItems || [];
+          item.status = 'Hoàn tất';
+        } catch (err) {
+          console.error(err);
+          item.status = 'Lỗi';
+          item.errorMsg = err.message;
+        }
+
+        renderFileList();
+        if (i === STATE.currentIndex) {
+          renderOverlay();
+          renderTextTab();
+        }
+
+        await new Promise(r => setTimeout(r, 1200));
+      }
+    });
+
+    // Sao chép text
+    document.getElementById('btnCopyText').addEventListener('click', () => {
+      navigator.clipboard.writeText(textContent.textContent);
+      alert('Đã sao chép nội dung văn bản!');
+    });
+
+    // Tải .TXT
+    document.getElementById('btnExportTxt').addEventListener('click', () => {
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || current.textItems.length === 0) return alert('Chưa có text để tải!');
+      const blob = new Blob([current.textItems.map(i => i.text).join('\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${current.name.replace(/\.[^/.]+$/, '')}.txt`;
+      a.click();
+    });
+
+    // Xuất PDF Overlay
+    document.getElementById('btnExportPdf').addEventListener('click', async () => {
+      const current = STATE.files[STATE.currentIndex];
+      if (!current || !current.textItems || current.textItems.length === 0) return alert('Chưa có dữ liệu để xuất PDF!');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: mainImg.naturalWidth > mainImg.naturalHeight ? 'l' : 'p',
+        unit: 'px',
+        format: [mainImg.naturalWidth, mainImg.naturalHeight]
+      });
+
+      pdf.addImage(current.dataUrl, 'PNG', 0, 0, mainImg.naturalWidth, mainImg.naturalHeight);
+      pdf.setTextColor(147, 51, 234);
+
+      current.textItems.forEach(item => {
+        if (!item.box_2d) return;
+        const [ymin, xmin, ymax, xmax] = item.box_2d;
+        const x = (xmin / 1000) * mainImg.naturalWidth;
+        const y = (ymax / 1000) * mainImg.naturalHeight;
+        const h = ((ymax - ymin) / 1000) * mainImg.naturalHeight;
+        pdf.setFontSize(Math.max(h * 0.8, 8));
+        pdf.text(item.text, x, y);
+      });
+
+      pdf.save(`${current.name.replace(/\.[^/.]+$/, '')}_overlay.pdf`);
+    });
+
+    // Xoá tất cả
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      STATE.files = [];
+      STATE.currentIndex = -1;
+      mainImg.style.display = 'none';
+      overlayLayer.innerHTML = '';
+      emptyNotice.style.display = 'block';
+      renderFileList();
+      textContent.textContent = '[Chưa có dữ liệu văn bản]';
+    });
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAD Batch OCR & PDF Overlay - Groq Vision v1.2</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jsPDF & JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    .overlay-box {
+      position: absolute;
+      background: rgba(168, 85, 247, 0.2);
+      border: 1px solid rgba(168, 85, 247, 0.8);
+      color: #9333ea;
+      font-size: 10px;
+      line-height: 1;
+      cursor: text;
+      user-select: text;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-lg bg-orange-500/20 text-orange-400">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-base tracking-wide">CAD Batch OCR & PDF Overlay</h1>
+          <span class="px-2 py-0.5 rounded bg-orange-500 text-slate-950 font-mono font-bold text-[10px]">GROQ VISION</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-400 text-slate-950 font-mono font-bold text-[10px]">v1.2</span>
+        </div>
+        <p class="text-xs text-slate-400">Tự động nạp Model Vision khả dụng • Xuất PDF Vector lớp chữ tím bôi đen copy</p>
+      </div>
+    </div>
+
     <!-- Cài đặt API Key & Model Dropdown -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs">
